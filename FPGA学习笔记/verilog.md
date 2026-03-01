@@ -31,6 +31,9 @@ _GP0/1:GP(General-Purpose Ports)通用接口
 S_AXI_ACP:(Accelerator Coherency Port)加速器一致性端口 PL到cache快速访问   
 S_AXI_HP0~3:(High Performance Ports)带有读/写FIFO的高性能端口，访问DDR
 
+
+-----
+
 # verilog HDL语法
 HDL：硬件编程语言  
 ## 符号 
@@ -99,17 +102,21 @@ endmodule
 输入输出属性有input output inout  
 常用信号数据类型wire,reg ，不说默认wire  
 信号位宽[n1:n2],不说默认1位
+向量名[起始位 +: 位宽]  // 向上（高位）扩展取位
+向量名[起始位 -: 位宽]  // 向下（低位）扩展取位  
+a[0+:4]即a[3:0]
+
+`timescale 1ns/1ps  仿真的单位/精度
 
 initial初始化语句，只执行一次，常用于测试文件的编写，用来产生仿真测试信号（激励信号）或对存储器变量赋初值
-
-begin  end相当于花括号，顺序块语句(过程块)
-
 **#+数字 表示延时**，后面再加一句#是往后加的时间
 
+begin  end相当于花括号，顺序块语句(过程块)
   
 assign:（组合逻辑）连续赋值语句，只要表达式中操作数有变化，立刻计算和赋值(和always @(*)同)**赋值目标是wire型的**  
 always:(组合/时序逻辑)块内顺序执行，块间并行  **赋值目标是reg型**
-   
+  组合逻辑的输出仅由当前输入决定，用阻塞赋值
+  时序逻辑的输出由当前输入和历史状态共同决定，有记忆能力，用非阻塞赋值
 always沿触发或电平触发  
 括号内的叫敏感列表
 ```
@@ -130,9 +137,15 @@ always @(*)begin
 end
 ```
 
-组合逻辑always块里可以用for语句批量并行
+组合逻辑always块里可以用for语句批量并行 
+循环变量在外面写或者always块定了名字可以写里面
 ```
-
+integer i;
+always @(*)begin
+  for(i=0;i<100;i=i+1) begin
+    out[i]=in[99-i];
+  end
+end
 ```
 
 一个always块内不要既用<=又用=  
@@ -159,7 +172,6 @@ casex不考虑x、z
 模块调用  
 例化实例元件(类比C语言函数调用)
 ```
-//f1
 //顶层模块
 module seg_led_static_top (
   input        sys_clk,
@@ -186,6 +198,19 @@ module time_count(
 parameter MAX_NUM = 50000_000;
 reg [24:0] cnt;
 ```
+
+generate-endgenerate批量例化
+```
+genvar i;//generate循环变量
+    generate //综合出100个并行硬件电路而非顺序仿真
+        for(i=1;i<100;i=i+1) begin:ripple_adder//命名块，必须写，generate成r[1],[2]...
+            full_adder fa(
+                .a(a[i])
+                /*,...*/
+            );
+        end
+    endgenerate
+```
 ------
 ## 状态机
 状态机：在有限个状态之间按一定规律转换的时序电路  
@@ -200,3 +225,29 @@ Moore:输出与当前状态有关
 3.下个状态判断（组合逻辑）
 4.各个状态下的动作（组合逻辑）
 最后可以再加一级寄存器，滤毛刺、时序计算方便、减少总线数据时间偏移
+
+-----
+
+# 其他知识
+## IP核
+Intellectual Property Core，知识产权核，预先设计、验证、可复用的功能电路模块
+
+常用IP核：
+XADC（Xilinx Analog-to-Digital Converter）片上混合信号硬核，温度 / 电压监控、外部传感器采集、系统健康监测
+VIO（Virtual Input/Output，虚拟输入输出），在线调试工具 IP，通过 JTAG实时修改 / 观测 FPGA 内部信号
+ILA（Integrated Logic Analyzer，集成逻辑分析仪），片上逻辑分析仪 IP，在硬件运行时实时抓取内部信号波形，用于定位时序 / 逻辑 bug
+
+要在代码例化ILA部分
+调试也可以在网表里加，查看的变量前加(*mark_debug="true"*)，自动生成XDC文件
+
+## 通信协议
+
+I2C(Inter-Integrated Circuit，集成电路总线)
+  SDA（Serial Data Line，串行数据线）
+  SCL（Serial Clock Line，串行时钟线）
+  主设备（Master）,从设备（Slave）,发送器（Transmitter）,接收器（Receiver）
+
+SPI (Serial Peripheral Interface，串行外设接口)
+
+UART (Universal Asynchronous Receiver/Transmitter，通用异步收发器)  
+  TX,RX 约定好波特率
